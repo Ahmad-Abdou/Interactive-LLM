@@ -1,6 +1,10 @@
 from flask import Flask, jsonify, render_template, request
 import google.generativeai as genai
 import os
+import time
+import json
+import re
+from flask import Response
 
 app = Flask(__name__)
 
@@ -53,6 +57,14 @@ def generate_with_fallback(user_message, conversation_history=None):
         'success': False
     }
 
+
+def _split_into_sentences(text):
+
+    if not text:
+        return []
+    parts = re.split(r'(?<=[\.\!\?])\s+', text)
+    return [p for p in parts if p.strip()]
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -92,32 +104,51 @@ def chat():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    """
-    Endpoint to check which models are currently available
-    """
-    available_models = []
-    
-    for model_name in MODEL_PRIORITY:
-        try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content("Hi")
-            available_models.append({
-                'name': model_name,
-                'status': 'available'
-            })
-        except Exception as e:
-            available_models.append({
-                'name': model_name,
-                'status': 'unavailable',
-                'error': str(e)[:100]
-            })
-    
-    return jsonify({
-        'models': available_models,
-        'priority_order': MODEL_PRIORITY
-    })
+
+@app.route('/chat_stream', methods=['POST'])
+def chat_stream():
+    try:
+        data = request.get_json()
+        user_message = data.get('message', '')
+
+        if not user_message:
+            return jsonify({'error': 'No message provided'}), 400
+
+        result = generate_with_fallback(user_message)
+
+        if not result['success']:
+            return jsonify({
+                'response': result['response'],
+                'error': True,
+                'model_used': None
+            }), 503
+
+        full_text = result['response']
+
+        paragraphs = re.split(r'\n\s*\n', full_text)
+
+        def generate():
+            for para in paragraphs:
+                sentences = _split_into_sentences(para)
+                if not sentences:
+                    yield (para + "\n")
+                    time.sleep(0.02)
+                    continue
+
+                for s in sentences:
+                    yield (s + "\n")
+                    time.sleep(0.02)
+
+                yield "\n"
+                time.sleep(0.01)
+
+            model_meta = json.dumps({'model_used': result['model_used']})
+            yield ("__MODEL_META__::" + model_meta + "\n")
+
+        return Response(generate(), mimetype='text/plain')
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True)
