@@ -21,40 +21,102 @@ inputArea.addEventListener('submit', async function(e) {
   chatArea.scrollTop = chatArea.scrollHeight;
   
   try {
-    const response = await fetch('/chat', {
+    const response = await fetch('/chat_stream', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({ message: msg })
     });
-    
-    const data = await response.json();
-    
-    typingMsg.remove();
-    
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ error: 'Unknown error' }));
+      typingMsg.remove();
+      const errorMsg = document.createElement('div');
+      errorMsg.className = 'message bot error';
+      errorMsg.textContent = 'Error: ' + (err.error || err.response || JSON.stringify(err));
+      chatArea.appendChild(errorMsg);
+      chatArea.scrollTop = chatArea.scrollHeight;
+      return;
+    }
+
     const botMsg = document.createElement('div');
     botMsg.className = 'message bot';
-    botMsg.textContent = data.response;
+    botMsg.innerHTML = '';
     chatArea.appendChild(botMsg);
 
-    if (data.model_used) {
-        const modelInfo = document.createElement('div');
-        modelInfo.className = 'model-info';
-        modelInfo.style.fontSize = '11px';
-        modelInfo.style.color = '#888';
-        modelInfo.style.marginTop = '5px';
-        modelInfo.textContent = `Model: ${data.model_used}`;
-        botMsg.appendChild(modelInfo);
-}
-    
-    if (data.visualization) {
-      const vizMsg = document.createElement('div');
-      vizMsg.className = 'message bot visualization';
-      vizMsg.innerHTML = '<div style="padding: 20px; background: #2d2d2d; border-radius: 8px; margin-top: 10px;">🎨 Interactive Playground would appear here!</div>';
-      chatArea.appendChild(vizMsg);
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let { value, done } = await reader.read();
+    let buffer = '';
+    let modelUsed = null;
+
+    function renderMarkdownChunk(chunk) {
+      let out = chunk
+        .replace(/###\s*(.*)/g, '<h3>$1</h3>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>');
+      return out;
     }
-    
+
+    while (!done) {
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n');
+      buffer = parts.pop();
+
+      for (const part of parts) {
+        if (!part) continue;
+        if (part.startsWith('__MODEL_META__::')) {
+          try {
+            const meta = JSON.parse(part.replace('__MODEL_META__::', ''));
+            modelUsed = meta.model_used;
+            if (modelUsed) {
+              const modelInfo = document.createElement('div');
+              modelInfo.className = 'model-info';
+              modelInfo.style.fontSize = '11px';
+              modelInfo.style.color = '#888';
+              modelInfo.style.marginTop = '5px';
+              modelInfo.textContent = `Model: ${modelUsed}`;
+              botMsg.appendChild(modelInfo);
+            }
+          } catch (e) {
+          }
+          continue;
+        }
+
+        const span = document.createElement('span');
+        span.innerHTML = renderMarkdownChunk(part);
+        botMsg.appendChild(span);
+        chatArea.scrollTop = chatArea.scrollHeight;
+      }
+
+      ({ value, done } = await reader.read());
+    }
+
+    if (buffer) {
+      if (buffer.startsWith('__MODEL_META__::')) {
+        try {
+          const meta = JSON.parse(buffer.replace('__MODEL_META__::', ''));
+          modelUsed = meta.model_used;
+          if (modelUsed) {
+            const modelInfo = document.createElement('div');
+            modelInfo.className = 'model-info';
+            modelInfo.style.fontSize = '11px';
+            modelInfo.style.color = '#888';
+            modelInfo.style.marginTop = '5px';
+            modelInfo.textContent = `Model: ${modelUsed}`;
+            botMsg.appendChild(modelInfo);
+          }
+        } catch (e) {}
+      } else {
+        const span = document.createElement('span');
+        span.innerHTML = renderMarkdownChunk(buffer);
+        botMsg.appendChild(span);
+      }
+    }
+
+    typingMsg.remove();
     chatArea.scrollTop = chatArea.scrollHeight;
     
   } catch (error) {
