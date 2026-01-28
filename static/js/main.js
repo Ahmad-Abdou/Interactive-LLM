@@ -2,6 +2,7 @@ const chatArea = document.getElementById('chat-area');
 const inputBox = document.getElementById('input-box');
 const inputArea = document.getElementById('input-area');
 
+
 inputArea.addEventListener('submit', async function(e) {
   e.preventDefault();
   const msg = inputBox.value.trim();
@@ -44,6 +45,37 @@ inputArea.addEventListener('submit', async function(e) {
     botMsg.className = 'message bot';
     botMsg.innerHTML = '';
     chatArea.appendChild(botMsg);
+
+    const vizTypeHeader = response.headers.get('X-Visualization-Type');
+    let vizInstance = null;
+    if (vizTypeHeader) {
+    const vizTypes = vizTypeHeader.split(',').map(s => s.trim().toLowerCase());
+    if (vizTypes.includes('underfitting') || vizTypes.includes('overfitting')) {
+
+    let visContainer = document.querySelector('.visualization-container');
+    if (!visContainer) {
+      visContainer = document.createElement('div');
+      visContainer.className = 'visualization-container';
+    Object.assign(visContainer.style, {
+      position: 'fixed',
+      right: '20px',
+      top: '20px',
+      width: '520px',
+      height: '520px',
+      background: '#fff',
+      border: '1px solid #ccc',
+      padding: '8px',
+      zIndex: 9999,
+      overflow: 'auto'
+    });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'Close';
+    closeBtn.style.cssText = 'position:absolute;right:6px;top:6px;';
+    closeBtn.addEventListener('click', () => visContainer.remove());
+    visContainer.appendChild(closeBtn);
+    document.body.appendChild(visContainer);
+  }}
+  }
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
