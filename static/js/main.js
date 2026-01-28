@@ -13,7 +13,7 @@ inputArea.addEventListener('submit', async function(e) {
   chatArea.appendChild(userMsg);
   chatArea.scrollTop = chatArea.scrollHeight;
   inputBox.value = '';
-  
+
   const typingMsg = document.createElement('div');
   typingMsg.className = 'message bot typing';
   typingMsg.textContent = 'Thinking...';
@@ -49,7 +49,6 @@ inputArea.addEventListener('submit', async function(e) {
     const decoder = new TextDecoder();
     let { value, done } = await reader.read();
     let buffer = '';
-    let modelUsed = null;
 
     function renderMarkdownChunk(chunk) {
       let out = chunk
@@ -67,23 +66,6 @@ inputArea.addEventListener('submit', async function(e) {
 
       for (const part of parts) {
         if (!part) continue;
-        if (part.startsWith('__MODEL_META__::')) {
-          try {
-            const meta = JSON.parse(part.replace('__MODEL_META__::', ''));
-            modelUsed = meta.model_used;
-            if (modelUsed) {
-              const modelInfo = document.createElement('div');
-              modelInfo.className = 'model-info';
-              modelInfo.style.fontSize = '11px';
-              modelInfo.style.color = '#888';
-              modelInfo.style.marginTop = '5px';
-              modelInfo.textContent = `Model: ${modelUsed}`;
-              botMsg.appendChild(modelInfo);
-            }
-          } catch (e) {
-          }
-          continue;
-        }
 
         const span = document.createElement('span');
         span.innerHTML = renderMarkdownChunk(part);
@@ -92,28 +74,6 @@ inputArea.addEventListener('submit', async function(e) {
       }
 
       ({ value, done } = await reader.read());
-    }
-
-    if (buffer) {
-      if (buffer.startsWith('__MODEL_META__::')) {
-        try {
-          const meta = JSON.parse(buffer.replace('__MODEL_META__::', ''));
-          modelUsed = meta.model_used;
-          if (modelUsed) {
-            const modelInfo = document.createElement('div');
-            modelInfo.className = 'model-info';
-            modelInfo.style.fontSize = '11px';
-            modelInfo.style.color = '#888';
-            modelInfo.style.marginTop = '5px';
-            modelInfo.textContent = `Model: ${modelUsed}`;
-            botMsg.appendChild(modelInfo);
-          }
-        } catch (e) {}
-      } else {
-        const span = document.createElement('span');
-        span.innerHTML = renderMarkdownChunk(buffer);
-        botMsg.appendChild(span);
-      }
     }
 
     typingMsg.remove();

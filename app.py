@@ -5,6 +5,7 @@ import time
 import json
 import re
 from flask import Response
+import difflib
 
 app = Flask(__name__)
 
@@ -16,50 +17,51 @@ MODEL_PRIORITY = [
     'gemini-2.5-flash',           
     'gemini-2.5-flash-lite',             
     'gemini-3-pro-preview',
-    'gemini-2.5-pro',                 
-                 
+    'gemini-2.5-pro',                               
 ]
 
-def generate_with_fallback(user_message, conversation_history=None):
+def contains_terms_with_typos(text, terms, cutoff=0.75):
+    text = text.lower()
+    tokens = re.findall(r"[a-z0-9\-]+", text)
+    for token in tokens:
+        for term in terms:
+            if token == term or difflib.SequenceMatcher(None, token, term).ratio() >= cutoff:
+                return True
+    return False
 
-    last_error = None
-    
+def generate_with_fallback(user_message):   
     for model_name in MODEL_PRIORITY:
         try:
             print(model_name)
             model = genai.GenerativeModel(model_name)
-            
-            response = model.generate_content(user_message)
-            
+            response = model.generate_content(user_message) 
             return {
                 'response': response.text,
                 'model_used': model_name,
                 'success': True
             }
-            
         except Exception as e:
-            error_msg = str(e)
-            print(f"Model {model_name} failed: {error_msg}")
-            last_error = error_msg
-            
-            if 'quota' in error_msg.lower() or 'rate limit' in error_msg.lower():
-                print(f"   Rate limit hit, trying next model...")
-                continue
-            elif 'not found' in error_msg.lower():
-                print(f" Model not available, trying next model...")
-                continue
-            else:
-                continue
-    
-    return {
-        'response': f"All models are currently unavailable. Last error: {last_error}",
-        'model_used': None,
-        'success': False
-    }
+            print(f"Model {model_name} failed: {str(e)}")
+
+def generate_with_visualization(user_message, type):
+    if type == ["underfitting", "overfitting"]:
+        print("BINGO")
+
+    for model_name in MODEL_PRIORITY:
+        try:
+            print(model_name)
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(user_message) 
+            return {
+                'response': response.text,
+                'model_used': model_name,
+                'success': True
+            }
+        except Exception as e:
+            print(f"Model {model_name} failed: {str(e)}")
 
 
 def _split_into_sentences(text):
-
     if not text:
         return []
     parts = re.split(r'(?<=[\.\!\?])\s+', text)
@@ -68,41 +70,6 @@ def _split_into_sentences(text):
 @app.route('/')
 def index():
     return render_template('index.html')
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    try:
-        data = request.get_json()
-        user_message = data.get('message', '')
-        
-        if not user_message:
-            return jsonify({'error': 'No message provided'}), 400
-        
-        result = generate_with_fallback(user_message)
-        
-        if not result['success']:
-            return jsonify({
-                'response': result['response'],
-                'error': True,
-                'model_used': None
-            }), 503
-        
-        visualization = None
-        if any(keyword in user_message.lower() for keyword in 
-               ['overfit', 'underfit', 'bias', 'variance', 'linear regression']):
-            visualization = {
-                'type': 'ml-playground',
-                'data': {}
-            }
-        
-        return jsonify({
-            'response': result['response'],
-            'visualization': visualization,
-            'model_used': result['model_used']
-        })
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/chat_stream', methods=['POST'])
@@ -113,9 +80,19 @@ def chat_stream():
 
         if not user_message:
             return jsonify({'error': 'No message provided'}), 400
+        
+        result= ''
 
-        result = generate_with_fallback(user_message)
+        if contains_terms_with_typos(user_message, ["underfitting", "overfitting"], cutoff=0.75):
+            result = generate_with_visualization(user_message, ["underfitting", "overfitting"])
+        # elif contains_terms_with_typos(user_message, ["underfitting", "overfitting"], cutoff=0.75):
+        #     result = generate_with_visualization(user_message, ["underfitting", "overfitting"])
 
+        # elif contains_terms_with_typos(user_message, ["underfitting", "overfitting"], cutoff=0.75):
+        #     result = generate_with_visualization(user_message, ["underfitting", "overfitting"])
+        else:
+            result = generate_with_fallback(user_message)
+        
         if not result['success']:
             return jsonify({
                 'response': result['response'],
@@ -141,9 +118,6 @@ def chat_stream():
 
                 yield "\n"
                 time.sleep(0.01)
-
-            model_meta = json.dumps({'model_used': result['model_used']})
-            yield ("__MODEL_META__::" + model_meta + "\n")
 
         return Response(generate(), mimetype='text/plain')
 
