@@ -43,8 +43,8 @@ def generate_with_fallback(user_message):
         except Exception as e:
             print(f"Model {model_name} failed: {str(e)}")
 
-def generate_with_visualization(user_message, type):
-    if type == ["underfitting", "overfitting"]:
+def generate_with_visualization(user_message, vis_type):
+    if vis_type == ["underfitting", "overfitting"]:
         print("BINGO")
 
     for model_name in MODEL_PRIORITY:
@@ -81,10 +81,11 @@ def chat_stream():
         if not user_message:
             return jsonify({'error': 'No message provided'}), 400
         
-        result= ''
-
+        result= None
+        vis_type = None
         if contains_terms_with_typos(user_message, ["underfitting", "overfitting"], cutoff=0.75):
-            result = generate_with_visualization(user_message, ["underfitting", "overfitting"])
+            vis_type = ["underfitting", "overfitting"]
+            result = generate_with_visualization(user_message, vis_type)
         # elif contains_terms_with_typos(user_message, ["underfitting", "overfitting"], cutoff=0.75):
         #     result = generate_with_visualization(user_message, ["underfitting", "overfitting"])
 
@@ -118,8 +119,10 @@ def chat_stream():
 
                 yield "\n"
                 time.sleep(0.01)
-
-        return Response(generate(), mimetype='text/plain')
+        headers = {}
+        if vis_type:
+            headers['X-Visualization-Type'] = ','.join(vis_type)
+        return Response(generate(), mimetype='text/plain', headers= headers)
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
