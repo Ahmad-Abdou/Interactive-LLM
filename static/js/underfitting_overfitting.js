@@ -11,20 +11,19 @@ class FittingVisualization {
         this.points = [];
         this.modelComplexity = 1; // 1 = linear, higher = polynomial
         
-        // Scales (will be initialized in initScales)
         this.xScale = null;
         this.yScale = null;
         
-        // SVG and group (will be created in init)
         this.svg = null;
         this.g = null;
-        
-        // Initialize the visualization
+
+        this.lastCheckedState = null
+        this.hasChangedSinceCheck = false
+
         this.init();
     }
     
     init() {
-        // Select container and create SVG
         const container = d3.select(`#${this.containerId}`);
         
         this.svg = container
@@ -34,19 +33,15 @@ class FittingVisualization {
             .style('background', '#f9f9f9')
             .style('cursor', 'crosshair');
         
-        // Create main group with margins
         this.g = this.svg
             .append('g')
             .attr('transform', `translate(${this.margin.left},${this.margin.top})`);
         
-        // Initialize scales
         this.initScales();
         
-        // Draw initial elements
         this.drawAxes();
         this.drawGrid();
         
-        // Set up click handler for adding points
         this.svg.on('click', (event) => this.handleClick(event));
     }
     
@@ -63,18 +58,15 @@ class FittingVisualization {
     }
     
     drawAxes() {
-        // X axis
         this.g.append('g')
             .attr('class', 'x-axis')
             .attr('transform', `translate(0,${this.innerHeight})`)
             .call(d3.axisBottom(this.xScale));
         
-        // Y axis
         this.g.append('g')
             .attr('class', 'y-axis')
             .call(d3.axisLeft(this.yScale));
         
-        // X axis label
         this.g.append('text')
             .attr('class', 'x-label')
             .attr('x', this.innerWidth / 2)
@@ -83,7 +75,6 @@ class FittingVisualization {
             .style('font-size', '12px')
             .text('Feature X');
         
-        // Y axis label
         this.g.append('text')
             .attr('class', 'y-label')
             .attr('transform', 'rotate(-90)')
@@ -95,7 +86,6 @@ class FittingVisualization {
     }
     
     drawGrid() {
-        // Vertical grid lines
         this.g.append('g')
             .attr('class', 'grid')
             .attr('transform', `translate(0,${this.innerHeight})`)
@@ -105,7 +95,6 @@ class FittingVisualization {
             .style('stroke', '#e0e0e0')
             .style('stroke-opacity', 0.5);
         
-        // Horizontal grid lines
         this.g.append('g')
             .attr('class', 'grid')
             .call(d3.axisLeft(this.yScale)
@@ -116,7 +105,6 @@ class FittingVisualization {
     }
     
     handleClick(event) {
-        // Get mouse coordinates relative to the g element
         const [mouseX, mouseY] = d3.pointer(event, this.g.node());
         
         // Convert pixel coordinates to data coordinates
@@ -140,6 +128,9 @@ class FittingVisualization {
         if (this.points.length >= 2) {
             this.drawFitLine();
         }
+        this.hasChangedSinceCheck = true
+        const pointCounter = document.getElementById('point-count')
+        pointCounter.textContent = this.points.length + " / 5"
     }
     
     drawPoints() {
@@ -180,19 +171,20 @@ class FittingVisualization {
     }
     
     removePoint(pointToRemove) {
-        // Filter out the clicked point
         this.points = this.points.filter(p => p !== pointToRemove);
         
-        // Redraw
         this.drawPoints();
         
-        // Update fit line
         if (this.points.length >= 2) {
             this.drawFitLine();
         } else {
-            // Remove fit line if not enough points
             this.g.select('.fit-line').remove();
         }
+
+        this.hasChangedSinceCheck = true
+        const pointCounter = document.getElementById('point-count')
+        pointCounter.textContent = this.points.length + " / 5"
+
     }
     
     drawFitLine() {
@@ -323,6 +315,8 @@ class FittingVisualization {
         if (this.points.length >= 2) {
             this.drawFitLine();
         }
+        this.hasChangedSinceCheck = true
+
     }
     
     clearPoints() {
@@ -336,12 +330,37 @@ class FittingVisualization {
     }
     
     destroy() {
-        // Clean up
         this.svg.remove();
     }
-}
 
-// Example usage:
-// const viz = new FittingVisualization('my-container', 600, 500);
-// viz.setModelComplexity(2);  // Change to quadratic
-// viz.clearPoints();          // Clear all points
+    getCurrentState() {
+        return {
+            points: JSON.parse(JSON.stringify(this.points)),
+            modelComplexity: this.modelComplexity
+        }
+    }
+
+    hasStateChanged() {
+        if (!this.lastCheckedState) {
+            return true
+        }
+
+        const current = this.getCurrentState()
+        const last = this.lastCheckedState
+
+        if (current.points.length !== last.points.length) {
+            return true
+        }
+
+        if (current.modelComplexity !== last.modelComplexity) {
+            return true
+        }
+
+        return false
+    }
+
+    markAsChecked() {
+        this.lastCheckedState = this.getCurrentState()
+        this.hasChangedSinceCheck = false
+    }
+}

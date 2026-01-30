@@ -49,24 +49,106 @@ inputArea.addEventListener('submit', async function(e) {
     if (vizTypeHeader) {
     const vizTypes = vizTypeHeader.split(',').map(s => s.trim().toLowerCase());
     if (vizTypes.includes('underfitting') || vizTypes.includes('overfitting')) {
-
-    let visContainer = document.querySelector('.visualization-container');
-    if (!visContainer) {
-        const vizContainer = document.createElement('div');
-        vizContainer.id = 'my-container'
-        vizContainer.style.cssText = `
-            margin-top: 15px;
-            padding: 10px;
-            background: #f5f5f5;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-        `
-        botMsg.appendChild(vizContainer);
-        
-        const viz = new FittingVisualization('my-container', 600, 500)
+      const vizContainer = document.createElement('div');
+      vizContainer.id = 'viz-wrapper';
+      vizContainer.style.cssText = `
+          display: flex;
+          gap: 15px;
+          margin-top: 15px;
+          padding: 15px;
+          background: #f5f5f5;
+          border-radius: 8px;
+          border: 1px solid #ddd;
+      `;
       
+      const canvasContainer = document.createElement('div')
+      canvasContainer.id = 'my-container';
+      canvasContainer.style.cssText = `
+          flex: 1;
+      `
+      const controlsContainer = document.createElement('div')
+      controlsContainer.id = 'controls-panel';
+      controlsContainer.style.cssText = `
+          width: 250px;
+          display: flex;
+          flex-direction: column;
+          gap: 15px;
+      `
 
-  }}
+      vizContainer.appendChild(canvasContainer)
+      vizContainer.appendChild(controlsContainer)
+      
+      botMsg.appendChild(vizContainer)
+      
+      const pointCounter = document.createElement('div')
+      pointCounter.style.cssText = `
+          background: white;
+          padding: 15px;
+          border-radius: 6px;
+          border: 1px solid #ddd;
+      `;
+      pointCounter.innerHTML = `
+          <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">Points Placed</div>
+          <div id="point-count" style="font-size: 24px; color: #4CAF50; font-weight: bold;">0 / 5</div>
+          <div style="font-size: 12px; color: #666; margin-top: 5px;">Click canvas to add points</div>
+      `
+      controlsContainer.appendChild(pointCounter)
+
+      const sliderControl = document.createElement('div');
+      sliderControl.style.cssText = `
+          background: white;
+          padding: 15px;
+          border-radius: 6px;
+          border: 1px solid #ddd;
+      `;
+      sliderControl.innerHTML = `
+          <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span style="font-weight: bold; font-size: 14px;">Polynomial Degree</span>
+              <span id="degree-value" style="background: #2196F3; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">1</span>
+          </div>
+          <input type="range" id="degree-slider" min="1" max="6" value="1" step="1" style="width: 100%;">
+          <div style="display: flex; justify-content: space-between; font-size: 11px; color: #888; margin-top: 5px;">
+              <span>Linear</span>
+              <span>Complex</span>
+          </div>
+      `;
+      controlsContainer.appendChild(sliderControl)
+
+      const slider = document.getElementById('degree-slider')
+      const degreeValue = document.getElementById('degree-value')
+
+      const sliderFeedback = document.createElement('div');
+      sliderFeedback.id = 'slider-feedback';
+      sliderFeedback.style.cssText = `
+          font-size: 12px;
+          padding: 8px;
+          border-radius: 4px;
+          margin-top: 8px;
+          display: none;
+      `;
+      sliderControl.appendChild(sliderFeedback);
+
+      const viz = new FittingVisualization('my-container', 600, 500)
+      
+      slider.addEventListener('input', (e) => {
+          const degree = parseInt(e.target.value);
+          const pointsNeeded = degree + 1;
+          const currentPoints = viz.points.length;
+          
+          degreeValue.textContent = degree;
+          
+          if (currentPoints >= pointsNeeded) {
+              viz.setModelComplexity(degree);
+              sliderFeedback.style.display = 'none';
+          } else {
+              sliderFeedback.style.display = 'block';
+              sliderFeedback.style.background = '#fff3cd';
+              sliderFeedback.style.color = '#856404';
+              sliderFeedback.style.border = '1px solid #ffc107';
+              sliderFeedback.textContent = `⚠️ Need ${pointsNeeded} points for degree ${degree}. You have ${currentPoints}. (Rule: points ≥ degree + 1)`;
+          }
+      });
+}
   }
 
     const reader = response.body.getReader();
