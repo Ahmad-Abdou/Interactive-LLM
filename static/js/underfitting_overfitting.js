@@ -1,12 +1,12 @@
 class FittingVisualization {
-    constructor(containerId, width, height) {
+    constructor(containerId, width, height, onStateChange) {
         this.containerId = containerId;
         this.width = width;
         this.height = height;
         this.margin = { top: 50, right: 50, bottom: 50, left: 50 };
         this.innerHeight = this.height - this.margin.top - this.margin.bottom;
         this.innerWidth = this.width - this.margin.left - this.margin.right;
-        
+        this.onStateChange = onStateChange;
         // Data storage
         this.points = [];
         this.modelComplexity = 1; // 1 = linear, higher = polynomial
@@ -118,19 +118,19 @@ class FittingVisualization {
     }
     
     addPoint(x, y) {
-        // Add point to data array
-        this.points.push({ x, y });
+        this.points.push({ x, y })
         
-        // Redraw points
-        this.drawPoints();
+        this.drawPoints()
         
-        // Update fit line if we have enough points
         if (this.points.length >= 2) {
             this.drawFitLine();
         }
         this.hasChangedSinceCheck = true
         const pointCounter = document.getElementById('point-count')
         pointCounter.textContent = this.points.length + " / 5"
+        if (this.onStateChange) {
+            this.onStateChange()
+        }
     }
     
     drawPoints() {
@@ -184,7 +184,9 @@ class FittingVisualization {
         this.hasChangedSinceCheck = true
         const pointCounter = document.getElementById('point-count')
         pointCounter.textContent = this.points.length + " / 5"
-
+        if (this.onStateChange) {
+            this.onStateChange()
+        }
     }
     
     drawFitLine() {
@@ -316,7 +318,9 @@ class FittingVisualization {
             this.drawFitLine();
         }
         this.hasChangedSinceCheck = true
-
+        if (this.onStateChange) {
+            this.onStateChange()
+        }
     }
     
     clearPoints() {
