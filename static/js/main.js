@@ -94,7 +94,7 @@ inputArea.addEventListener('submit', async function(e) {
       `
       controlsContainer.appendChild(pointCounter)
 
-      const sliderControl = document.createElement('div');
+      const sliderControl = document.createElement('div')
       sliderControl.style.cssText = `
           background: white;
           padding: 15px;
@@ -111,13 +111,13 @@ inputArea.addEventListener('submit', async function(e) {
               <span>Linear</span>
               <span>Complex</span>
           </div>
-      `;
+      `
       controlsContainer.appendChild(sliderControl)
 
       const slider = document.getElementById('degree-slider')
       const degreeValue = document.getElementById('degree-value')
 
-      const sliderFeedback = document.createElement('div');
+      const sliderFeedback = document.createElement('div')
       sliderFeedback.id = 'slider-feedback';
       sliderFeedback.style.cssText = `
           font-size: 12px;
@@ -125,31 +125,66 @@ inputArea.addEventListener('submit', async function(e) {
           border-radius: 4px;
           margin-top: 8px;
           display: none;
-      `;
+      `
       sliderControl.appendChild(sliderFeedback);
 
-      const viz = new FittingVisualization('my-container', 600, 500)
+      // Function to update Check button state
+      function updateCheckButton() {
+          const hasChanged = viz.hasStateChanged()
+          const hasEnoughPoints = viz.points.length >= 5
+          
+          if (hasChanged && hasEnoughPoints) {
+              checkButton.disabled = false
+              checkButton.style.cursor = 'pointer'
+              checkButton.style.background = '#4CAF50'
+              checkButton.style.color = 'white'
+          } else {
+              checkButton.disabled = true
+              checkButton.style.cursor = 'not-allowed'
+              checkButton.style.background = '#ccc'
+              checkButton.style.color = '#666'
+          }
+      }
+
+      const viz = new FittingVisualization('my-container', 600, 500, updateCheckButton)
       
       slider.addEventListener('input', (e) => {
-          const degree = parseInt(e.target.value);
-          const pointsNeeded = degree + 1;
-          const currentPoints = viz.points.length;
+          const degree = parseInt(e.target.value)
+          const pointsNeeded = degree + 1
+          const currentPoints = viz.points.length
           
-          degreeValue.textContent = degree;
+          degreeValue.textContent = degree
           
           if (currentPoints >= pointsNeeded) {
-              viz.setModelComplexity(degree);
-              sliderFeedback.style.display = 'none';
+              viz.setModelComplexity(degree)
+              sliderFeedback.style.display = 'none'
           } else {
-              sliderFeedback.style.display = 'block';
-              sliderFeedback.style.background = '#fff3cd';
-              sliderFeedback.style.color = '#856404';
-              sliderFeedback.style.border = '1px solid #ffc107';
-              sliderFeedback.textContent = `⚠️ Need ${pointsNeeded} points for degree ${degree}. You have ${currentPoints}. (Rule: points ≥ degree + 1)`;
+              sliderFeedback.style.display = 'block'
+              sliderFeedback.style.background = '#fff3cd'
+              sliderFeedback.style.color = '#856404'
+              sliderFeedback.style.border = '1px solid #ffc107'
+              sliderFeedback.textContent = `⚠️ Need ${pointsNeeded} points for degree ${degree}. You have ${currentPoints}. (Rule: points ≥ degree + 1)`
           }
-      });
-}
+      })
+      const checkButton = document.createElement('button')
+      checkButton.id = 'check-button'
+      checkButton.textContent = 'Check My Work'
+      checkButton.disabled = true
+      checkButton.style.cssText = `
+          padding: 15px;
+          border-radius: 6px;
+          border: none;
+          font-size: 16px;
+          font-weight: bold;
+          cursor: not-allowed;
+          background: #ccc;
+          color: #666;
+          transition: all 0.3s;
+      `;
+      controlsContainer.appendChild(checkButton);
+    }
   }
+
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -195,3 +230,4 @@ inputArea.addEventListener('submit', async function(e) {
     chatArea.scrollTop = chatArea.scrollHeight;
   }
 });
+
