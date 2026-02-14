@@ -7,9 +7,8 @@ class FittingVisualization {
         this.innerHeight = this.height - this.margin.top - this.margin.bottom;
         this.innerWidth = this.width - this.margin.left - this.margin.right;
         this.onStateChange = onStateChange;
-        // Data storage
         this.points = [];
-        this.modelComplexity = 1; // 1 = linear, higher = polynomial
+        this.modelComplexity = 1;
         
         this.xScale = null;
         this.yScale = null;
@@ -46,12 +45,10 @@ class FittingVisualization {
     }
     
     initScales() {
-        // X scale: data range 0-100, pixel range 0-innerWidth
         this.xScale = d3.scaleLinear()
             .domain([0, 100])
             .range([0, this.innerWidth]);
         
-        // Y scale: data range 0-100, pixel range innerHeight-0 (inverted for SVG coordinates)
         this.yScale = d3.scaleLinear()
             .domain([0, 100])
             .range([this.innerHeight, 0]);
@@ -107,11 +104,9 @@ class FittingVisualization {
     handleClick(event) {
         const [mouseX, mouseY] = d3.pointer(event, this.g.node());
         
-        // Convert pixel coordinates to data coordinates
         const dataX = this.xScale.invert(mouseX);
         const dataY = this.yScale.invert(mouseY);
         
-        // Check if click is within bounds
         if (dataX >= 0 && dataX <= 100 && dataY >= 0 && dataY <= 100) {
             this.addPoint(dataX, dataY);
         }
@@ -134,11 +129,9 @@ class FittingVisualization {
     }
     
     drawPoints() {
-        // Bind data to circles
         const circles = this.g.selectAll('circle.data-point')
             .data(this.points);
         
-        // Enter: create new circles for new data
         circles.enter()
             .append('circle')
             .attr('class', 'data-point')
@@ -157,12 +150,10 @@ class FittingVisualization {
             .duration(300)
             .attr('r', 8);
         
-        // Update: update existing circles
         circles
             .attr('cx', d => this.xScale(d.x))
             .attr('cy', d => this.yScale(d.y));
         
-        // Exit: remove circles for removed data
         circles.exit()
             .transition()
             .duration(300)
@@ -190,24 +181,20 @@ class FittingVisualization {
     }
     
     drawFitLine() {
-        // Calculate polynomial regression
         const coefficients = this.calculatePolynomialRegression(this.points, this.modelComplexity);
         
         if (!coefficients) return;
         
-        // Generate line points
         const linePoints = [];
         for (let x = 0; x <= 100; x += 1) {
             let y = 0;
             for (let i = 0; i <= this.modelComplexity; i++) {
                 y += coefficients[i] * Math.pow(x, i);
             }
-            // Clamp y to visible range
             y = Math.max(0, Math.min(100, y));
             linePoints.push({ x, y });
         }
         
-        // Create line generator
         const line = d3.line()
             .x(d => this.xScale(d.x))
             .y(d => this.yScale(d.y))
@@ -231,8 +218,6 @@ class FittingVisualization {
     }
     
     calculatePolynomialRegression(points, degree) {
-        // Simplified polynomial regression using normal equations
-        // For production, you'd want a more robust implementation
         
         if (points.length < degree + 1) return null;
         
@@ -240,7 +225,6 @@ class FittingVisualization {
         const X = [];
         const y = points.map(p => p.y);
         
-        // Build design matrix
         for (let i = 0; i < n; i++) {
             const row = [];
             for (let j = 0; j <= degree; j++) {
@@ -249,13 +233,11 @@ class FittingVisualization {
             X.push(row);
         }
         
-        // Solve using least squares (simplified)
         return this.solveLinearSystem(X, y);
     }
     
     solveLinearSystem(X, y) {
-        // Simplified least squares solution
-        // Calculate X'X and X'y
+
         const n = y.length;
         const k = X[0].length;
         
@@ -273,7 +255,6 @@ class FittingVisualization {
             }
         }
         
-        // Solve using Gaussian elimination
         return this.gaussianElimination(XtX, Xty);
     }
     
@@ -281,7 +262,6 @@ class FittingVisualization {
         const n = b.length;
         const Ab = A.map((row, i) => [...row, b[i]]);
         
-        // Forward elimination
         for (let i = 0; i < n; i++) {
             let maxRow = i;
             for (let k = i + 1; k < n; k++) {
@@ -299,7 +279,6 @@ class FittingVisualization {
             }
         }
         
-        // Back substitution
         const x = Array(n).fill(0);
         for (let i = n - 1; i >= 0; i--) {
             x[i] = Ab[i][n];

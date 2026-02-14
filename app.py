@@ -59,10 +59,11 @@ def _split_into_sentences(text):
     parts = re.split(r'(?<=[\.\!\?])\s+', text)
     return [p for p in parts if p.strip()]
 
+
 def initialize_learning_context(concepts):
     """Initialize minimal session context for interactive learning"""
     return {
-        'concepts': concepts,
+        'concepts': concepts, 
         'feedback_count': 0,
         'conversation_active': True,
         'attempt_history': []
@@ -270,7 +271,7 @@ def check_visualization():
         current_attempt = {
             'point_count': len(points),
             'degree': degree,
-            'points_summary': f"{len(points)} points"
+            'points_summary': f"{len(points)} points" 
         }
         attempt_history.append(current_attempt)
         
@@ -289,6 +290,179 @@ def check_visualization():
         
     except Exception as e:
         print(f"Error in check_visualization: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/start_quiz', methods=['POST'])
+def start_quiz():
+    """
+    Initialize quiz session and return quiz questions.
+    Called when student is ready to test their knowledge.
+    """
+    try:
+        context = get_learning_context()
+        
+        if not context:
+            return jsonify({'error': 'No learning session found'}), 400
+        
+        quiz_questions = [
+            {
+                'id': 1,
+                'image': 'quiz_q1_underfitting.png',
+                'question': 'Figure 1A shows a polynomial regression model fitted to observed data. What problem does this model exhibit?',
+                'options': [
+                    'A) Underfitting - the model is too simple to capture the data pattern',
+                    'B) Overfitting - the model is too complex for the data',
+                    'C) Balanced fit - the model appropriately captures the trend',
+                    'D) Insufficient data - we need more points to determine'
+                ],
+                'correct_answer': 'A',
+                'explanation': 'The straight line (degree 1) cannot capture the obvious curve in the data. The model is too simple (high bias), resulting in systematic errors. This is classic underfitting.'
+            },
+            {
+                'id': 2,
+                'image': 'quiz_q2_overfitting.png',
+                'question': 'Figure 1B displays a degree-4 polynomial fitted to 5 training points. Evaluate this modeling approach.',
+                'options': [
+                    'A) Appropriate - higher degrees always improve accuracy',
+                    'B) Underfitting - should use even higher degree',
+                    'C) Overfitting - the model is too complex for this sample size',
+                    'D) Balanced - the fit looks smooth enough'
+                ],
+                'correct_answer': 'C',
+                'explanation': 'With degree 4 and only 5 points (degree = n-1), the model has enough flexibility to perfectly fit the training data, including noise. This model won\'t generalize well - classic overfitting.'
+            },
+            {
+                'id': 3,
+                'image': 'quiz_q3_balanced.png',
+                'question': 'Figure 2A shows data fitted with a degree-2 polynomial model. Assess the model\'s complexity.',
+                'options': [
+                    'A) Overfitting - degree is too high',
+                    'B) Underfitting - needs higher degree',
+                    'C) Balanced - appropriate complexity for the data',
+                    'D) Cannot determine without test set performance'
+                ],
+                'correct_answer': 'C',
+                'explanation': 'The quadratic model (degree 2) captures the curved trend without trying to pass through every point exactly. With 6 points and degree 2, the fit is smooth and follows the general pattern - this is the "sweet spot."'
+            },
+            {
+                'id': 4,
+                'image': 'quiz_q4_tricky_overfit.png',
+                'question': 'Figure 2B presents a degree-6 polynomial fitted to 9 data points. The data follows a roughly linear trend. What is the likely issue?',
+                'options': [
+                    'A) Balanced - the smooth fit indicates appropriate complexity',
+                    'B) Underfitting - linear trend suggests we could use simpler model',
+                    'C) Overfitting - unnecessarily high degree for simple pattern',
+                    'D) Perfect fit - degree matches data complexity'
+                ],
+                'correct_answer': 'C',
+                'explanation': 'This is tricky! The curve looks smooth, but using degree-6 for nearly linear data is still overfitting. The data pattern is simple, but we\'re using way more complexity than needed. This won\'t generalize well.'
+            },
+            {
+                'id': 5,
+                'image': 'quiz_q5_extreme_overfit.png',
+                'question': 'In Figure 3, a degree-4 polynomial is fitted to 5 observations. The model passes through every data point. Evaluate this approach.',
+                'options': [
+                    'A) Excellent - zero training error achieved',
+                    'B) Overfitting - model memorizes noise rather than learning pattern',
+                    'C) Balanced - just enough complexity',
+                    'D) Underfitting - should use degree-5 or higher'
+                ],
+                'correct_answer': 'B',
+                'explanation': 'When degree equals (n-1), the polynomial can pass through all points exactly. Zero training error does NOT mean good model! This is extreme overfitting - the model memorizes noise and will perform terribly on new data.'
+            }
+        ]
+        
+        quiz_session = {
+            'started_at': time.time(),
+            'questions': quiz_questions,
+            'answers': {},
+            'completed': False
+        }
+        
+        session['quiz_session'] = quiz_session
+        
+        update_learning_context({'quiz_started': True})
+        
+        return jsonify({
+            'questions': quiz_questions,
+            'time_limit_seconds': 300,
+            'total_questions': len(quiz_questions)
+        })
+        
+    except Exception as e:
+        print(f"Error in start_quiz: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/submit_quiz', methods=['POST'])
+def submit_quiz():
+    """
+    Score quiz and return results with explanations.
+    """
+    try:
+        data = request.get_json()
+        answers = data.get('answers', {})
+        time_taken = data.get('time_taken_seconds', 0)
+        
+        quiz_session = session.get('quiz_session')
+        if not quiz_session:
+            return jsonify({'error': 'No quiz session found'}), 400
+        
+        questions = quiz_session['questions']
+        
+        results = []
+        correct_count = 0
+        
+        for q in questions:
+            q_id = str(q['id'])
+            selected = answers.get(q_id, '')
+            correct = q['correct_answer']
+            is_correct = (selected == correct)
+            
+            if is_correct:
+                correct_count += 1
+            
+            results.append({
+                'question_id': q['id'],
+                'question': q['question'],
+                'image': q['image'],
+                'selected': selected,
+                'correct': correct,
+                'is_correct': is_correct,
+                'explanation': q['explanation']
+            })
+        
+        total_questions = len(questions)
+        score_percentage = (correct_count / total_questions) * 100
+        passed = score_percentage >= 60 
+        
+        quiz_results = {
+            'score': correct_count,
+            'total': total_questions,
+            'percentage': score_percentage,
+            'passed': passed,
+            'time_taken': time_taken,
+            'results': results,
+            'completed_at': time.time()
+        }
+        
+        session['quiz_results'] = quiz_results
+        quiz_session['completed'] = True
+        session['quiz_session'] = quiz_session
+        
+        context = get_learning_context()
+        update_learning_context({
+            'quiz_completed': True,
+            'quiz_score': score_percentage
+        })
+        
+        print(f"Quiz completed: {correct_count}/{total_questions} ({score_percentage:.1f}%)")
+        
+        return jsonify(quiz_results)
+        
+    except Exception as e:
+        print(f"Error in submit_quiz: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
