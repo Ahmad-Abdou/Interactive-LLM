@@ -1,3 +1,5 @@
+
+
 const chatArea = document.getElementById('chat-area');
 const inputArea = document.getElementById('input-area');
 const inputBox = document.getElementById('input-box');
@@ -32,9 +34,11 @@ if (!document.getElementById('main-animations')) {
 function createVisualization(botMsg) {
   const vizId = 'viz-' + Date.now();
   const containerId = 'container-' + Date.now();
+  const vizInstanceId = Date.now();
   
   const vizContainer = document.createElement('div');
   vizContainer.id = vizId;
+  vizContainer.setAttribute('data-viz-id', vizInstanceId);
   vizContainer.style.cssText = `
     display: flex;
     gap: 15px;
@@ -51,6 +55,7 @@ function createVisualization(botMsg) {
   
   const controlsContainer = document.createElement('div');
   controlsContainer.className = 'controls-panel';
+  controlsContainer.setAttribute('data-viz-id', vizInstanceId);
   controlsContainer.style.cssText = `
     width: 280px;
     display: flex;
@@ -71,8 +76,8 @@ function createVisualization(botMsg) {
   `;
   pointCounter.innerHTML = `
     <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">Points Placed</div>
-    <div id="point-count" style="font-size: 24px; color: #4CAF50; font-weight: bold;">0</div>
-    <div style="font-size: 12px; color: #666; margin-top: 5px;">Click canvas to add points</div>
+    <div id="point-count" style="font-size: 24px; color: #4CAF50; font-weight: bold;">0 / 10</div>
+    <div style="font-size: 12px; color: #666; margin-top: 5px;">Max 10 points</div>
   `;
   controlsContainer.appendChild(pointCounter);
 
@@ -85,19 +90,22 @@ function createVisualization(botMsg) {
   `;
   const sliderId = 'degree-slider-' + Date.now();
   const degreeValueId = 'degree-value-' + Date.now();
+  const degreeMessageId = 'degree-message-' + Date.now();
   sliderControl.innerHTML = `
     <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
       <span style="font-weight: bold; font-size: 14px;">Polynomial Degree</span>
       <span id="${degreeValueId}" style="background: #2196F3; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">1</span>
     </div>
-    <input type="range" id="${sliderId}" min="1" max="6" value="1" step="1" style="width: 100%;">
+    <input type="range" id="${sliderId}" min="1" max="1" value="1" step="1" style="width: 100%;">
     <div style="display: flex; justify-content: space-between; font-size: 11px; color: #888; margin-top: 5px;">
       <span>Simple</span>
       <span>Complex</span>
     </div>
+    <div id="${degreeMessageId}" style="font-size: 12px; color: #ff9800; margin-top: 8px; min-height: 16px; font-style: italic;"></div>
   `;
   controlsContainer.appendChild(sliderControl);
 
+  // Check button
   const checkButton = document.createElement('button');
   checkButton.className = 'check-button';
   checkButton.textContent = 'Check My Work';
@@ -125,7 +133,7 @@ function createVisualization(botMsg) {
   controlsContainer.appendChild(checkButton);
 
   const viewFeedbackButton = document.createElement('button');
-  viewFeedbackButton.id = 'view-feedback-btn';
+  viewFeedbackButton.id = 'view-feedback-btn-' + Date.now();
   viewFeedbackButton.textContent = 'View Last Feedback';
   viewFeedbackButton.style.cssText = `
     padding: 15px;
@@ -173,6 +181,7 @@ function createVisualization(botMsg) {
   });
   controlsContainer.appendChild(resetButton);
 
+  // Quiz button
   const quizButton = document.createElement('button');
   quizButton.id = 'quiz-button';
   quizButton.innerHTML = `
@@ -204,13 +213,66 @@ function createVisualization(botMsg) {
     
     const slider = document.getElementById(sliderId);
     const degreeValue = document.getElementById(degreeValueId);
+    const degreeMessage = document.getElementById(degreeMessageId);
     
+    const thisControlPanel = document.querySelector(`[data-viz-id="${vizInstanceId}"]`);
+    const pointCountElement = thisControlPanel.querySelector('#point-count');
+
+    function updateSliderMax() {
+      const numPoints = viz.points.length;
+      const maxDegree = Math.min(Math.max(1, numPoints - 1), 6); // Cap at 6
+      slider.max = maxDegree;
+      
+      if (parseInt(slider.value) > maxDegree) {
+        slider.value = maxDegree;
+        degreeValue.textContent = maxDegree;
+        viz.modelComplexity = maxDegree;
+      }
+      
+      pointCountElement.textContent = `${numPoints} / 10`;
+      
+      if (numPoints < 2) {
+        degreeMessage.textContent = 'Place at least 2 points';
+      } else if (maxDegree < 6) {
+        degreeMessage.textContent = `Add ${7 - numPoints} more point(s) to unlock degree 6`;
+      } else {
+        degreeMessage.textContent = '';
+      }
+    }
+
+    const originalAddPoint = viz.addPoint.bind(viz);
+    viz.addPoint = function(x, y) {
+      if (this.points.length >= 10) {
+        alert('Maximum 10 points reached! Reset canvas to start over.');
+        return;
+      }
+      originalAddPoint(x, y);
+      updateSliderMax();
+    };
+
+    const originalRemovePoint = viz.removePoint.bind(viz);
+    viz.removePoint = function(point) {
+      originalRemovePoint(point);
+      updateSliderMax();
+    };
+
     slider.addEventListener('input', (e) => {
       const degree = parseInt(e.target.value);
+      const numPoints = viz.points.length;
+      
       degreeValue.textContent = degree;
       viz.modelComplexity = degree;
-      if (viz.points.length >= 2) {
-        viz.drawFitLine();
+      
+      // Check if we have enough points
+      if (numPoints < degree + 1) {
+        degreeMessage.textContent = `Need ${degree + 1} points for degree ${degree}`;
+        degreeMessage.style.color = '#f5576c';
+        // Don't update the line if insufficient points
+      } else {
+        degreeMessage.textContent = '';
+        if (viz.points.length >= 2) {
+          viz.drawFitLine();
+        }
       }
     });
 
@@ -252,7 +314,6 @@ function createVisualization(botMsg) {
         displayFeedback(data.feedback, elapsed);
         
         lastFeedback = { text: data.feedback, elapsed: elapsed };
-        
         viewFeedbackButton.style.display = 'block';
         
         attemptCount++;
@@ -279,10 +340,7 @@ function createVisualization(botMsg) {
         degreeValue.textContent = '1';
         viz.modelComplexity = 1;
         
-        const pointCounter = document.getElementById('point-count');
-        if (pointCounter) {
-          pointCounter.textContent = '0';
-        }
+        updateSliderMax();
       }
     });
 
@@ -293,6 +351,8 @@ function createVisualization(botMsg) {
         }
       }
     });
+    
+    updateSliderMax();
     
     chatArea.scrollTop = chatArea.scrollHeight;
   }, 100);
@@ -456,12 +516,10 @@ function displayFeedback(feedbackText, elapsed) {
     e.target.style.background = 'rgba(255,255,255,0.2)';
   });
   
-  // Assemble
   sidebar.appendChild(header);
   sidebar.appendChild(content);
   sidebar.appendChild(footer);
   
-  // Close on Escape
   const escHandler = (e) => {
     if (e.key === 'Escape') {
       closeSidebar();
@@ -485,7 +543,25 @@ inputArea.addEventListener('submit', async function(e) {
   chatArea.scrollTop = chatArea.scrollHeight;
   inputBox.value = '';
 
-  // Thinking indicator
+  inputBox.disabled = true;
+  const sendButton = document.querySelector('button[type="submit"]');
+  const originalSendHTML = sendButton.innerHTML;
+  const originalSendStyle = sendButton.style.cssText;
+  
+  sendButton.innerHTML = '⏹ Stop';
+  sendButton.type = 'button';
+  sendButton.style.cssText = `
+    padding: 12px 24px;
+    background: #f5576c;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  `;
+
   const thinkingMsg = document.createElement('div');
   thinkingMsg.className = 'message bot';
   thinkingMsg.id = 'thinking-indicator';
@@ -539,6 +615,7 @@ inputArea.addEventListener('submit', async function(e) {
   thinkingMsg.appendChild(spinner);
   thinkingMsg.appendChild(textContainer);
   thinkingMsg.appendChild(timer);
+  
   chatArea.appendChild(thinkingMsg);
   chatArea.scrollTop = chatArea.scrollHeight;
   
@@ -553,11 +630,49 @@ inputArea.addEventListener('submit', async function(e) {
     timer.textContent = `${elapsed.toFixed(1)}s`;
   }, 100);
   
+  const abortController = new AbortController();
+  const signal = abortController.signal;
+  
+  const restoreInputArea = () => {
+    inputBox.disabled = false;
+    sendButton.type = 'submit';
+    sendButton.innerHTML = originalSendHTML;
+    sendButton.style.cssText = originalSendStyle;
+    inputBox.focus();
+  };
+  
+  const stopHandler = () => {
+    abortController.abort();
+    clearInterval(dotInterval);
+    clearInterval(timerInterval);
+    thinkingMsg.remove();
+    
+    const stoppedMsg = document.createElement('div');
+    stoppedMsg.className = 'message bot';
+    stoppedMsg.style.cssText = `
+      padding: 15px;
+      background: #fff5f5;
+      border-left: 4px solid #f5576c;
+      border-radius: 4px;
+      color: #666;
+      font-style: italic;
+    `;
+    stoppedMsg.textContent = '⏹ Generation stopped by user.';
+    chatArea.appendChild(stoppedMsg);
+    chatArea.scrollTop = chatArea.scrollHeight;
+    
+    restoreInputArea();
+    sendButton.removeEventListener('click', stopHandler);
+  };
+  
+  sendButton.addEventListener('click', stopHandler);
+  
   try {
     const response = await fetch('/chat_stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: msg })
+      body: JSON.stringify({ message: msg }),
+      signal: signal 
     });
 
     if (!response.ok) {
@@ -696,16 +811,28 @@ inputArea.addEventListener('submit', async function(e) {
     if (shouldCreateViz && instructionText) {
       createVisualization(botMsg);
     }
+    
+    sendButton.removeEventListener('click', stopHandler);
+    restoreInputArea();
 
   } catch (error) {
     clearInterval(dotInterval);
     clearInterval(timerInterval);
     thinkingMsg.remove();
+    sendButton.removeEventListener('click', stopHandler);
+    
+    if (error.name === 'AbortError') {
+      console.log('Request aborted by user');
+      return; 
+    }
+    
     console.error('Error:', error);
     const errorMsg = document.createElement('div');
     errorMsg.className = 'message bot error';
     errorMsg.textContent = 'Sorry, something went wrong. Please try again.';
     chatArea.appendChild(errorMsg);
     chatArea.scrollTop = chatArea.scrollHeight;
+    
+    restoreInputArea();
   }
 });

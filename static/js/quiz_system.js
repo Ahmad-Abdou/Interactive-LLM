@@ -1,3 +1,5 @@
+// Quiz System - Modal with Scrollable Questions
+// Fixed: Question area scrolls when content is too long
 
 class QuizSystem {
   constructor() {
@@ -52,6 +54,7 @@ class QuizSystem {
       document.head.appendChild(style);
     }
 
+    // Full-screen overlay
     const overlay = document.createElement('div');
     overlay.id = 'quiz-modal-overlay';
     overlay.style.cssText = `
@@ -71,6 +74,7 @@ class QuizSystem {
       box-sizing: border-box;
     `;
 
+    // Modal container
     const modal = document.createElement('div');
     modal.id = 'quiz-modal';
     modal.style.cssText = `
@@ -86,6 +90,7 @@ class QuizSystem {
       position: relative;
     `;
 
+    // Header (fixed)
     const header = document.createElement('div');
     header.style.cssText = `
       display: flex;
@@ -115,6 +120,7 @@ class QuizSystem {
       ">5:00</div>
     `;
 
+    // Progress (fixed)
     const progress = document.createElement('div');
     progress.id = 'quiz-progress';
     progress.style.cssText = `
@@ -126,16 +132,17 @@ class QuizSystem {
       flex-shrink: 0;
     `;
 
+    // Question container (SCROLLABLE)
     const questionContainer = document.createElement('div');
     questionContainer.id = 'question-container';
     questionContainer.style.cssText = `
       padding: 25px 30px;
+      overflow-y: auto;
       flex: 1;
       min-height: 0;
-      display: flex;
-      flex-direction: column;
     `;
 
+    // Navigation (fixed)
     const navButtons = document.createElement('div');
     navButtons.style.cssText = `
       display: flex;
@@ -189,7 +196,6 @@ class QuizSystem {
     modal.appendChild(navButtons);
 
     overlay.appendChild(modal);
-
     document.body.appendChild(overlay);
   }
 
@@ -202,23 +208,22 @@ class QuizSystem {
 
     const container = document.getElementById('question-container');
     container.innerHTML = '';
-    container.style.display = 'flex';
-    container.style.flexDirection = 'column';
-    container.style.gap = '20px';
+    container.scrollTop = 0; // Scroll to top when new question loads
 
+    // Image (constrained)
     const imageDiv = document.createElement('div');
     imageDiv.style.cssText = `
       text-align: center;
       background: #f9f9f9;
       padding: 15px;
       border-radius: 8px;
-      flex-shrink: 0;
+      margin-bottom: 20px;
     `;
     const img = document.createElement('img');
     img.src = `/static/quiz_images/${question.image}`;
     img.style.cssText = `
       max-width: 100%;
-      max-height: 280px;
+      max-height: 300px;
       height: auto;
       border: 1px solid #ddd;
       border-radius: 4px;
@@ -227,23 +232,24 @@ class QuizSystem {
     imageDiv.appendChild(img);
     container.appendChild(imageDiv);
 
+    // Question text
     const questionText = document.createElement('div');
     questionText.style.cssText = `
       font-size: 16px;
       color: #333;
-      line-height: 1.5;
+      margin-bottom: 20px;
+      line-height: 1.6;
       font-weight: 500;
-      flex-shrink: 0;
     `;
     questionText.textContent = question.question;
     container.appendChild(questionText);
 
+    // Options
     const optionsDiv = document.createElement('div');
     optionsDiv.style.cssText = `
       display: flex;
       flex-direction: column;
       gap: 10px;
-      flex-shrink: 0;
     `;
 
     question.options.forEach((option, optIndex) => {
@@ -389,6 +395,7 @@ class QuizSystem {
     modal.style.maxHeight = '95vh';
     modal.style.overflowY = 'auto';
 
+    // Header
     const header = document.createElement('div');
     header.style.cssText = `
       text-align: center;
@@ -396,7 +403,6 @@ class QuizSystem {
       background: ${results.passed ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'};
       color: white;
       border-radius: 12px 12px 0 0;
-      flex-shrink: 0;
     `;
 
     const emoji = results.passed ? '🎉' : '📚';
@@ -413,6 +419,7 @@ class QuizSystem {
     const contentWrapper = document.createElement('div');
     contentWrapper.style.cssText = 'padding: 30px;';
 
+    // Time
     const timeDiv = document.createElement('div');
     timeDiv.style.cssText = `
       text-align: center;
@@ -424,6 +431,7 @@ class QuizSystem {
     const seconds = results.time_taken % 60;
     timeDiv.textContent = `Completed in ${minutes}:${seconds.toString().padStart(2, '0')}`;
 
+    // Results
     const resultsDiv = document.createElement('div');
     
     results.results.forEach((result, index) => {
@@ -465,6 +473,7 @@ class QuizSystem {
       resultsDiv.appendChild(questionDiv);
     });
 
+    // Back button
     const buttonDiv = document.createElement('div');
     buttonDiv.style.cssText = `
       text-align: center;

@@ -31,25 +31,56 @@ def contains_terms_with_typos(text, terms, cutoff=0.75):
                 return True
     return False
 
-def generate_with_fallback(prompt):
-    """Call Gemini API with fallback through model priority list"""
+def generate_with_fallback(prompt, stream=False):
+    """
+    Call Gemini API with fallback through model priority list.
+    SUPPORTS TRUE STREAMING when stream=True - yields chunks as they arrive!
+    """
     for model_name in MODEL_PRIORITY:
         try:
             print(f"Using model: {model_name}")
             model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt) 
-            return {
-                'response': response.text,
-                'model_used': model_name,
-                'success': True
+            
+            # Optimized config for complete responses
+            generation_config = {
+                'temperature': 0.7,
+                'max_output_tokens': 2048,  # Increased to allow full explanations + instructions
             }
+            
+            if stream:
+                # TRUE STREAMING - yields chunks AS THEY ARRIVE from Gemini
+                response = model.generate_content(
+                    prompt,
+                    stream=True,  # ← KEY FIX: Enable streaming at API level
+                    generation_config=generation_config
+                )
+                return {
+                    'response_stream': response,  # Generator that yields chunks
+                    'model_used': model_name,
+                    'success': True,
+                    'is_stream': True
+                }
+            else:
+                # Non-streaming (for feedback endpoint where we need full response)
+                response = model.generate_content(
+                    prompt,
+                    generation_config=generation_config
+                )
+                return {
+                    'response': response.text,
+                    'model_used': model_name,
+                    'success': True,
+                    'is_stream': False
+                }
+                
         except Exception as e:
             print(f"Model {model_name} failed: {str(e)}")
     
     return {
         'response': 'Sorry, I am unable to process your request at the moment.',
         'model_used': None,
-        'success': False
+        'success': False,
+        'is_stream': False
     }
 
 def _split_into_sentences(text):
@@ -128,6 +159,13 @@ def create_feedback_prompt(user_message, points, degree, concepts, attempt_histo
     
     prompt = f"""You are analyzing a student's visualization about {concepts_text}.
 
+IMPORTANT CONSTRAINTS:
+- The interface allows maximum 10 points
+- The interface allows maximum degree 6
+- NEVER suggest degree 7 or higher
+- For overfitting examples, say "try degree 5 or 6" (not higher)
+- If more complexity needed, say "add more points (up to 10) and try degree 5-6"
+
 {history_text}Current attempt (Attempt {len(attempt_history) + 1}):
 - {point_count} points on the canvas
 - Polynomial degree set to {degree}
@@ -140,7 +178,7 @@ Provide analytical feedback (2-4 sentences):
 2. Identify what concept this demonstrates (underfitting, overfitting, or balanced)
 3. Explain WHY using the specific data they created
 4. If they have previous attempts, acknowledge their progression
-5. Suggest what to try next
+5. Suggest what to try next (respecting the constraints above)
 
 Format your response with proper line breaks between sentences for readability.
 
@@ -186,34 +224,28 @@ def chat_stream():
             print(f"Learning session started for: {vis_concepts}")
             
             prompt = create_teaching_prompt(user_message, vis_concepts)
-            result = generate_with_fallback(prompt)
+            result = generate_with_fallback(prompt, stream=True)  # ← ENABLE STREAMING
         else:
-            result = generate_with_fallback(user_message)
+            result = generate_with_fallback(user_message, stream=True)  # ← ENABLE STREAMING
         
         if not result['success']:
             return jsonify({
-                'response': result['response'],
+                'response': result.get('response', 'Error occurred'),
                 'error': True,
                 'model_used': None
             }), 503
 
-        full_text = result['response']
-        paragraphs = re.split(r'\n\s*\n', full_text)
-
+        # TRUE STREAMING - yield chunks as they arrive from Gemini
         def generate():
-            for para in paragraphs:
-                sentences = _split_into_sentences(para)
-                if not sentences:
-                    yield (para + "\n")
-                    time.sleep(0.02)
-                    continue
-
-                for s in sentences:
-                    yield (s + "\n")
-                    time.sleep(0.02)
-
-                yield "\n"
-                time.sleep(0.01)
+            try:
+                response_stream = result['response_stream']
+                for chunk in response_stream:
+                    if chunk.text:
+                        # Yield each chunk IMMEDIATELY as it arrives
+                        yield chunk.text
+            except Exception as e:
+                print(f"Streaming error: {str(e)}")
+                yield f"\n[Error: {str(e)}]"
         
         headers = {}
         if vis_concepts:
