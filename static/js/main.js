@@ -1,4 +1,5 @@
-
+// Enhanced Main.js - Interactive Learning System
+// Fixed: Multiple viz support, point limits, dynamic slider, sidebar feedback
 
 const chatArea = document.getElementById('chat-area');
 const inputArea = document.getElementById('input-area');
@@ -8,6 +9,7 @@ let currentViz = null;
 let attemptCount = 0;
 let lastFeedback = null;
 
+// Add animations CSS
 if (!document.getElementById('main-animations')) {
   const style = document.createElement('style');
   style.id = 'main-animations';
@@ -34,7 +36,7 @@ if (!document.getElementById('main-animations')) {
 function createVisualization(botMsg) {
   const vizId = 'viz-' + Date.now();
   const containerId = 'container-' + Date.now();
-  const vizInstanceId = Date.now();
+  const vizInstanceId = Date.now(); // Unique ID for this viz instance
   
   const vizContainer = document.createElement('div');
   vizContainer.id = vizId;
@@ -67,6 +69,7 @@ function createVisualization(botMsg) {
   vizContainer.appendChild(controlsContainer);
   botMsg.appendChild(vizContainer);
 
+  // Point counter with standard ID but in scoped container
   const pointCounter = document.createElement('div');
   pointCounter.style.cssText = `
     background: white;
@@ -81,6 +84,7 @@ function createVisualization(botMsg) {
   `;
   controlsContainer.appendChild(pointCounter);
 
+  // Degree slider
   const sliderControl = document.createElement('div');
   sliderControl.style.cssText = `
     background: white;
@@ -132,6 +136,7 @@ function createVisualization(botMsg) {
   });
   controlsContainer.appendChild(checkButton);
 
+  // View Last Feedback button
   const viewFeedbackButton = document.createElement('button');
   viewFeedbackButton.id = 'view-feedback-btn-' + Date.now();
   viewFeedbackButton.textContent = 'View Last Feedback';
@@ -160,6 +165,94 @@ function createVisualization(botMsg) {
   });
   controlsContainer.appendChild(viewFeedbackButton);
 
+  // Challenge card (shows when challenge is active)
+  const challengeCard = document.createElement('div');
+  challengeCard.id = 'challenge-card';
+  challengeCard.style.cssText = `
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 15px;
+    border-radius: 6px;
+    color: white;
+    display: none;
+    margin-bottom: 10px;
+  `;
+  challengeCard.innerHTML = `
+    <div style="font-weight: bold; margin-bottom: 8px; font-size: 14px;">🎯 Active Challenge</div>
+    <div id="challenge-description" style="font-size: 14px; margin-bottom: 10px; line-height: 1.5;"></div>
+    <button id="dismiss-challenge-btn" style="
+      padding: 8px 16px;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid white;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all 0.2s;
+    ">Dismiss Challenge</button>
+  `;
+  controlsContainer.appendChild(challengeCard);
+
+  // Show Challenge button
+  const showChallengeBtn = document.createElement('button');
+  showChallengeBtn.id = 'show-challenge-btn';
+  showChallengeBtn.innerHTML = '💡 Show Challenge';
+  showChallengeBtn.style.cssText = `
+    padding: 15px;
+    border-radius: 6px;
+    border: 1px solid #667eea;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    background: white;
+    color: #667eea;
+    transition: all 0.3s;
+    display: none;
+  `;
+  showChallengeBtn.addEventListener('mouseenter', () => {
+    showChallengeBtn.style.background = '#f0f0ff';
+  });
+  showChallengeBtn.addEventListener('mouseleave', () => {
+    showChallengeBtn.style.background = 'white';
+  });
+  showChallengeBtn.addEventListener('click', async () => {
+    try {
+      const response = await fetch('/generate_challenge', { method: 'POST' });
+      const data = await response.json();
+      
+      if (data.success) {
+        challengeCard.style.display = 'block';
+        document.getElementById('challenge-description').textContent = data.challenge.description;
+        showChallengeBtn.style.display = 'none';
+      } else {
+        alert(data.message || 'No challenges available yet. Click "Check My Work" first!');
+      }
+    } catch (error) {
+      console.error('Error activating challenge:', error);
+      alert('Failed to load challenge. Please try again.');
+    }
+  });
+  controlsContainer.appendChild(showChallengeBtn);
+
+  // Dismiss challenge handler
+  const dismissBtn = challengeCard.querySelector('#dismiss-challenge-btn');
+  dismissBtn.addEventListener('click', async () => {
+    try {
+      await fetch('/dismiss_challenge', { method: 'POST' });
+      challengeCard.style.display = 'none';
+      showChallengeBtn.style.display = 'block';
+    } catch (error) {
+      console.error('Error dismissing challenge:', error);
+    }
+  });
+  dismissBtn.addEventListener('mouseenter', () => {
+    dismissBtn.style.background = 'rgba(255,255,255,0.3)';
+  });
+  dismissBtn.addEventListener('mouseleave', () => {
+    dismissBtn.style.background = 'rgba(255,255,255,0.2)';
+  });
+
+  // Reset button
   const resetButton = document.createElement('button');
   resetButton.textContent = 'Reset Canvas';
   resetButton.style.cssText = `
@@ -215,22 +308,27 @@ function createVisualization(botMsg) {
     const degreeValue = document.getElementById(degreeValueId);
     const degreeMessage = document.getElementById(degreeMessageId);
     
+    // Get point counter within THIS visualization's control panel
     const thisControlPanel = document.querySelector(`[data-viz-id="${vizInstanceId}"]`);
     const pointCountElement = thisControlPanel.querySelector('#point-count');
 
+    // Update slider max based on points
     function updateSliderMax() {
       const numPoints = viz.points.length;
       const maxDegree = Math.min(Math.max(1, numPoints - 1), 6); // Cap at 6
       slider.max = maxDegree;
       
+      // If current value exceeds new max, adjust it
       if (parseInt(slider.value) > maxDegree) {
         slider.value = maxDegree;
         degreeValue.textContent = maxDegree;
         viz.modelComplexity = maxDegree;
       }
       
+      // Update point counter
       pointCountElement.textContent = `${numPoints} / 10`;
       
+      // Update degree message
       if (numPoints < 2) {
         degreeMessage.textContent = 'Place at least 2 points';
       } else if (maxDegree < 6) {
@@ -240,6 +338,7 @@ function createVisualization(botMsg) {
       }
     }
 
+    // Override addPoint to enforce 10 point limit and update slider
     const originalAddPoint = viz.addPoint.bind(viz);
     viz.addPoint = function(x, y) {
       if (this.points.length >= 10) {
@@ -250,12 +349,14 @@ function createVisualization(botMsg) {
       updateSliderMax();
     };
 
+    // Override removePoint to update slider
     const originalRemovePoint = viz.removePoint.bind(viz);
     viz.removePoint = function(point) {
       originalRemovePoint(point);
       updateSliderMax();
     };
 
+    // Slider change handler
     slider.addEventListener('input', (e) => {
       const degree = parseInt(e.target.value);
       const numPoints = viz.points.length;
@@ -276,6 +377,7 @@ function createVisualization(botMsg) {
       }
     });
 
+    // Check button
     checkButton.addEventListener('click', async () => {
       checkButton.disabled = true;
       
@@ -316,6 +418,16 @@ function createVisualization(botMsg) {
         lastFeedback = { text: data.feedback, elapsed: elapsed };
         viewFeedbackButton.style.display = 'block';
         
+        // Challenge integration
+        if (data.pending_challenges > 0 && !data.active_challenge) {
+          showChallengeBtn.style.display = 'block';
+        }
+        
+        if (data.challenge_mode && data.challenge_success) {
+          challengeCard.style.display = 'none';
+          showChallengeBtn.style.display = 'block';
+        }
+        
         attemptCount++;
         updateQuizButton(quizButton, attemptCount);
         
@@ -330,6 +442,7 @@ function createVisualization(botMsg) {
       }
     });
 
+    // Reset button
     resetButton.addEventListener('click', () => {
       if (confirm('Clear all points and reset? This cannot be undone.')) {
         viz.points = [];
@@ -344,6 +457,7 @@ function createVisualization(botMsg) {
       }
     });
 
+    // Quiz button
     quizButton.addEventListener('click', () => {
       if (!quizButton.disabled) {
         if (confirm('Ready to test your knowledge? You\'ll have 5 minutes to complete 5 questions.')) {
@@ -352,6 +466,7 @@ function createVisualization(botMsg) {
       }
     });
     
+    // Initial slider max update
     updateSliderMax();
     
     chatArea.scrollTop = chatArea.scrollHeight;
@@ -543,13 +658,14 @@ inputArea.addEventListener('submit', async function(e) {
   chatArea.scrollTop = chatArea.scrollHeight;
   inputBox.value = '';
 
+  // Disable input and hide/replace Send button with Stop button
   inputBox.disabled = true;
   const sendButton = document.querySelector('button[type="submit"]');
   const originalSendHTML = sendButton.innerHTML;
   const originalSendStyle = sendButton.style.cssText;
   
   sendButton.innerHTML = '⏹ Stop';
-  sendButton.type = 'button';
+  sendButton.type = 'button'; // Prevent form submission
   sendButton.style.cssText = `
     padding: 12px 24px;
     background: #f5576c;
@@ -630,9 +746,11 @@ inputArea.addEventListener('submit', async function(e) {
     timer.textContent = `${elapsed.toFixed(1)}s`;
   }, 100);
   
+  // Create abort controller for stopping the request
   const abortController = new AbortController();
   const signal = abortController.signal;
   
+  // Function to restore input area
   const restoreInputArea = () => {
     inputBox.disabled = false;
     sendButton.type = 'submit';
@@ -641,6 +759,7 @@ inputArea.addEventListener('submit', async function(e) {
     inputBox.focus();
   };
   
+  // Stop button handler (now on the Send button)
   const stopHandler = () => {
     abortController.abort();
     clearInterval(dotInterval);
@@ -672,7 +791,7 @@ inputArea.addEventListener('submit', async function(e) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: msg }),
-      signal: signal 
+      signal: signal  // Add signal for aborting
     });
 
     if (!response.ok) {
@@ -812,6 +931,7 @@ inputArea.addEventListener('submit', async function(e) {
       createVisualization(botMsg);
     }
     
+    // Restore input area after response completes
     sendButton.removeEventListener('click', stopHandler);
     restoreInputArea();
 
@@ -821,9 +941,10 @@ inputArea.addEventListener('submit', async function(e) {
     thinkingMsg.remove();
     sendButton.removeEventListener('click', stopHandler);
     
+    // Check if it was an abort (user clicked stop)
     if (error.name === 'AbortError') {
       console.log('Request aborted by user');
-      return; 
+      return;  // Already showed "stopped" message and restored input
     }
     
     console.error('Error:', error);
