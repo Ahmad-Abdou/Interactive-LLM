@@ -208,29 +208,31 @@ class QuizSystem {
 
     const container = document.getElementById('question-container');
     container.innerHTML = '';
-    container.scrollTop = 0; // Scroll to top when new question loads
+    container.scrollTop = 0;
 
-    // Image (constrained)
-    const imageDiv = document.createElement('div');
-    imageDiv.style.cssText = `
-      text-align: center;
-      background: #f9f9f9;
-      padding: 15px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-    `;
-    const img = document.createElement('img');
-    img.src = `/static/quiz_images/${question.image}`;
-    img.style.cssText = `
-      max-width: 100%;
-      max-height: 300px;
-      height: auto;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      object-fit: contain;
-    `;
-    imageDiv.appendChild(img);
-    container.appendChild(imageDiv);
+    // Only show image if it exists
+    if (question.image) {
+      const imageDiv = document.createElement('div');
+      imageDiv.style.cssText = `
+        text-align: center;
+        background: #f9f9f9;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+      `;
+      const img = document.createElement('img');
+      img.src = `/static/quiz_images/${question.image}`;
+      img.style.cssText = `
+        max-width: 100%;
+        max-height: 300px;
+        height: auto;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        object-fit: contain;
+      `;
+      imageDiv.appendChild(img);
+      container.appendChild(imageDiv);
+    }
 
     // Question text
     const questionText = document.createElement('div');
