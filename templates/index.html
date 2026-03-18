@@ -1,25 +1,39 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="stylesheet" href="../static/css/style.css">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Interactive Chat App</title>
-  </head>
-  <body>
-    <div id="container">
-      <div id="chat-area">
-        <div class="message bot">Hello! How can I help you?</div>
-      </div>
-      <form id="input-area" autocomplete="off">
-        <input id="input-box" type="text" placeholder="Type your message..." required />
-        <button id="send-btn" type="submit">Send</button>
-      </form>
-    </div>
-    <script src="../static/js/main.js"></script>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <script src="/static/js/underfitting_overfitting.js"></script>
-    <script src="/static/js/quiz_system.js"></script>
 
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <link rel="stylesheet" href="../static/css/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive AI Learning</title>
+</head>
+
+<body>
+  <div id="container">
+    <div id="chat-area">
+      <div class="message bot">Hello! I'm your interactive AI tutor. Ask me about any topic — if it can be visualized,
+        I'll create an interactive canvas for you to explore! Try asking about <strong>overfitting and
+          underfitting</strong>, <strong>binary search trees</strong>, or <strong>sorting algorithms</strong>.</div>
+    </div>
+    <form id="input-area" autocomplete="off">
+      <input id="input-box" type="text" placeholder="Ask about any topic..." required />
+      <button id="send-btn" type="submit">Send</button>
+    </form>
+  </div>
+
+  <!-- D3 for SVG rendering -->
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <!-- Element-based system (load order matters) -->
+  <script src="/static/js/elements.js"></script>
+  <script src="/static/js/controls.js"></script>
+  <script src="/static/js/behaviors.js"></script>
+  <script src="/static/js/animation_engine.js"></script>
+  <script src="/static/js/canvas_engine.js"></script>
+
+  <!-- Main app & quiz -->
+  <script src="/static/js/main.js"></script>
+  <script src="/static/js/quiz_system.js"></script>
+</body>
+
 </html>
