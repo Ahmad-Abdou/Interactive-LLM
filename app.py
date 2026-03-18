@@ -3,19 +3,40 @@ import google.generativeai as genai
 import time
 import re
 import difflib
+import os
+from pathlib import Path
 from data_logger import DataLogger
 from challenge_manager import ChallengeManager, initialize_challenge_state
 from admin_dashboard import render_admin_dashboard
 
+
+def load_local_env():
+    env_path = Path(__file__).resolve().parent / '.env'
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding='utf-8').splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        key, value = line.split('=', 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_local_env()
+
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-this-in-production'
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-only-change-me')
 
 logger = DataLogger(data_dir='user_study_data')
 challenge_mgr = ChallengeManager()
 server_storage = {}
 
-GEMINI_API_KEY = "REDACTED_OLD_KEY"
-genai.configure(api_key=GEMINI_API_KEY)
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '').strip()
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+else:
+    print('Warning: GEMINI_API_KEY is not set. AI features will be unavailable until it is configured.')
 
 MODEL_PRIORITY = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3-pro-preview', 'gemini-2.5-pro']
 
@@ -46,6 +67,9 @@ def contains_terms_with_typos(text, terms, cutoff=0.75):
     return False
 
 def generate_with_fallback(prompt, stream=False):
+    if not GEMINI_API_KEY:
+        return {'response': 'GEMINI_API_KEY is missing', 'success': False}
+
     for model_name in MODEL_PRIORITY:
         try:
             model = genai.GenerativeModel(model_name)
@@ -104,6 +128,8 @@ Your response should look EXACTLY like this structure:
 [Paragraph 2 about overfitting]
 
 [Paragraph 3 about the goal/balance]
+
+make sure each paragrpah is written on its own line.
 
 [INTERACTIVE_INSTRUCTIONS]
 Now let's make this hands-on! I've opened an interactive canvas below.

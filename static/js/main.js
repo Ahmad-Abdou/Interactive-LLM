@@ -864,7 +864,7 @@ inputArea.addEventListener('submit', async function(e) {
             color: #667eea;
             font-size: 15px;
           `;
-          separator.innerHTML = '🎯 Let\'s Try This Together!';
+          separator.innerHTML = ' Let\'s Try This Together!';
           botMsg.appendChild(separator);
           continue;
         }
