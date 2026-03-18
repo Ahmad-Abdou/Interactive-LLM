@@ -28,7 +28,8 @@ load_local_env()
 app = Flask(__name__)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev-only-change-me')
 
-logger = DataLogger(data_dir='user_study_data')
+DATA_DIR = '/tmp/user_study_data' if os.getenv('VERCEL') else 'user_study_data'
+logger = DataLogger(data_dir=DATA_DIR)
 challenge_mgr = ChallengeManager()
 server_storage = {}
 
